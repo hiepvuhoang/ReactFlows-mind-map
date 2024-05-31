@@ -1,0 +1,74 @@
+body {
+  margin: 0;
+  background-color: #f2f5f7;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.header {
+  color: #cdcdcd;
+}
+
+.tonode {
+  background: '#fff';
+  border-radius: 2px;
+  padding: 2px 5px;
+  border: 1px solid purple;
+  font-size: 14px;
+  width: 150px;
+  background-color: #fff;
+}
+
+.tonode .label {
+  font-size: 14px;
+}
+
+.tonode .status {
+  font-size: 10px;
+  color: green;
+}
+
+.tonode__empty {
+  border-color: lightgray;
+  color: lightgray;
+}
+
+.react-flow .react-flow__connectionline {
+  z-index: 0;
+}
+
+.dragHandle {
+  background: transparent;
+  width: 14px;
+  height: 100%;
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
+  pointer-events: all;
+}
+
+.react-flow__handle.connectionindicator {
+  visibility: hidden;
+}
+
+.edgebutton {
+  height: 14px;
+  background: #eee;
+  border: 1px solid #fff;
+  cursor: pointer;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.edgebutton:hover {
+  box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.08);
+}
+
+.react-flow__edge:hover {
+  stroke-width: 3 !important;
+}
