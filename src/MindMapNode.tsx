@@ -18,7 +18,6 @@ function MindMapNode({ id, data }: NodeProps<NodeData>) {
         </div>
         {data?.isCollapsable && <button className="edgebutton"></button>}
       </div>
-      
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </>

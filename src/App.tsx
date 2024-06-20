@@ -1,19 +1,15 @@
-import React, { useState } from 'react';
+import React, { useCallback, useLayoutEffect } from 'react';
 import ReactFlow, {
-  Controls,
   ReactFlowProvider,
-  NodeOrigin,
-  ConnectionLineType,
   useNodesState,
   useEdgesState,
-  getOutgoers,
-  getConnectedEdges,
-  Node,
+  useReactFlow,
+  addEdge,
 } from 'reactflow';
 import { shallow } from 'zustand/shallow';
+import ELK from 'elkjs/lib/elk.bundled.js'
 
 import useStore, { RFState } from './store';
-import MindMapNode from './MindMapNode';
 
 import './index.css';
 
@@ -25,92 +21,92 @@ const selector = (state: RFState) => ({
   edges: state.edges,
 });
 
-const nodeTypes = {
-  mindmap: MindMapNode,
+const elk = new ELK();
+
+// Elk has a *huge* amount of options to configure. To see everything you can
+// tweak check out:
+//
+// - https://www.eclipse.org/elk/reference/algorithms.html
+// - https://www.eclipse.org/elk/reference/options.html
+const elkOptions = {
+  'elk.algorithm': 'layered',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+  'elk.spacing.nodeNode': '80',
 };
 
-const nodeOrigin: NodeOrigin = [0.5, 0.5];
-const connectionLineStyle = { stroke: 'pink', strokeWidth: 2 };
-const defaultEdgeOptions = { style: connectionLineStyle, type: 'float' };
+const getLayoutedElements = (nodes, edges, options = {}) => {
+  const graph = {
+    id: 'root',
+    layoutOptions: options,
+    children: nodes.map((node) => ({
+      ...node,
+      // Adjust the target and source handle positions based on the layout
+      // direction.
+      targetPosition: 'left',
+      sourcePosition: 'right',
+
+      // Hardcode a width and height for elk to use when layouting.
+      width: 150,
+      height: 50,
+    })),
+    edges: edges,
+  };
+
+  return elk
+    .layout(graph)
+    .then((layoutedGraph) => ({
+      nodes: layoutedGraph.children?.map((node) => ({
+        ...node,
+        // React Flow expects a position property on the node instead of `x`
+        // and `y` fields.
+        position: { x: node.x, y: node.y },
+      })),
+
+      edges: layoutedGraph.edges,
+    }))
+    .catch(console.error);
+};
 
 function Flow() {
-  // whenever you use multiple values, you should use shallow for making sure that the component only re-renders when one of the values change
   const { nodes: layoutedNodes, edges: layoutedEdges } = useStore(
     selector,
     shallow,
   );
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitView } = useReactFlow();
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
+  const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), []);
+  const onLayout = useCallback(
+    ({ direction, useInitialNodes = false }) => {
+      const opts = { 'elk.direction': direction, ...elkOptions };
+      const ns = useInitialNodes ? layoutedNodes : nodes;
+      const es = useInitialNodes ? layoutedEdges : edges;
 
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
-  const [hidden, setHidden] = useState(true);
+      getLayoutedElements(ns, es, opts).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
 
-  const hide = (hidden: boolean, childEdgeID: string | any[], childNodeID: string | any[]) => (nodeOrEdge: any) => {
-    if (
-      childEdgeID.includes(nodeOrEdge.id) ||
-      childNodeID.includes(nodeOrEdge.id)
-    )
-      nodeOrEdge.hidden = hidden;
-    return nodeOrEdge;
-  };
-
-  const checkTarget = (edge, id) => {
-    const edges = edge.filter((ed) => {
-      return ed.target !== id;
-    });
-    return edges;
-  };
-
-  const outgoers: Node<any, string | undefined>[] = [];
-  const connectedEdges: any[] = [];
-  const stack = [];
-
-  const nodeClick = (some, node) => {
-    const currentNodeID = node.id;
-    stack.push(node);
-    while (stack.length > 0) {
-      const lastNOde = stack.pop();
-      const childnode = getOutgoers(lastNOde, nodes, edges);
-      const childedge = checkTarget(
-        getConnectedEdges([lastNOde], edges),
-        currentNodeID
-      );
-      childnode.map((goer, key) => {
-        stack.push(goer);
-        outgoers.push(goer);
+        window.requestAnimationFrame(() => fitView());
       });
-      childedge.map((edge, key) => {
-        connectedEdges.push(edge);
-      });
-    }
+    },
+    [nodes, edges]
+  );
 
-    const childNodeID = outgoers.map((node) => {
-      return node.id;
-    });
-    const childEdgeID = connectedEdges.map((edge) => {
-      return edge.id;
-    });
-
-    setNodes((node) => node.map(hide(hidden, childEdgeID, childNodeID)));
-    setEdges((edge) => edge.map(hide(hidden, childEdgeID, childNodeID)));
-    setHidden(!hidden);
-  };
+  // Calculate the initial layout on mount.
+  useLayoutEffect(() => {
+    onLayout({ direction: 'RIGHT', useInitialNodes: true });
+  }, []);
 
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
+      onConnect={onConnect}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      nodeTypes={nodeTypes}
-      nodeOrigin={nodeOrigin}
-      connectionLineStyle={connectionLineStyle}
-      defaultEdgeOptions={defaultEdgeOptions}
-      connectionLineType={ConnectionLineType.Straight}
-      onNodeClick={nodeClick}
       fitView
     >
-      <Controls showInteractive={false} />
     </ReactFlow>
   );
 }
